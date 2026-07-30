@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Run Protocol</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #18181c;
+    --border: #2a2a30;
+    --run: #e8f55c;
+    --walk: #5ce8c4;
+    --text: #f0f0f0;
+    --muted: #6b6b7a;
+    --danger: #ff5c5c;
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  #app { width: 100%; max-width: 420px; min-height: 100dvh; display: flex; flex-direction: column; padding: 0 0 env(safe-area-inset-bottom); }
+
+  /* ── STAGE SELECT ────────────────────────────── */
+  #stage-select {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 20px 24px;
+    gap: 24px;
+  }
+
+  .brand {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .brand-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+  .brand-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .select-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .stage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stage-btn {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    color: var(--text);
+  }
+  .stage-btn:active { transform: scale(0.97); }
+  .stage-btn.selected {
+    border-color: var(--run);
+    background: rgba(232,245,92,0.06);
+  }
+
+  .stage-btn .stage-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--run);
+    margin-bottom: 6px;
+  }
+  .stage-btn .stage-info {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .stage-btn .stage-info span.r { color: var(--run); }
+  .stage-btn .stage-info span.w { color: var(--walk); }
+
+  .start-btn {
+    width: 100%;
+    padding: 18px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--run);
+    color: #0d0d0f;
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: auto;
+  }
+  .start-btn:active { transform: scale(0.98); }
+  .start-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── TIMER ───────────────────────────────────── */
+  #timer-view {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    padding: 24px 20px 24px;
+    gap: 16px;
+  }
+
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .stage-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .rep-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .rep-badge span { color: var(--text); font-weight: 500; }
+
+  /* big arc */
+  .arc-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 8px 0;
+  }
+
+  .arc-svg-wrap {
+    position: relative;
+    width: 260px;
+    height: 260px;
+  }
+
+  .arc-svg-wrap svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .arc-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .phase-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: color 0.3s;
+  }
+  .phase-label.run { color: var(--run); }
+  .phase-label.walk { color: var(--walk); }
+
+  .time-display {
+    font-family: 'Syne', sans-serif;
+    font-size: 64px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+  .time-display.run { color: var(--run); }
+  .time-display.walk { color: var(--walk); }
+
+  .next-phase {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+  .next-phase span { color: var(--text); }
+
+  /* rep dots */
+  .rep-track {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 4px 0;
+  }
+  .rep-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    transition: all 0.2s;
+  }
+  .rep-dot.done {
+    background: var(--run);
+    border-color: var(--run);
+  }
+  .rep-dot.active {
+    border-color: var(--run);
+    box-shadow: 0 0 0 3px rgba(232,245,92,0.15);
+  }
+
+  /* current rep detail */
+  .interval-strip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .interval-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .interval-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .interval-val.r { color: var(--run); }
+  .interval-val.w { color: var(--walk); }
+  .interval-unit {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .interval-divider { width: 1px; height: 28px; background: var(--border); }
+
+  /* controls */
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: auto;
+  }
+  .ctrl-btn {
+    padding: 16px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ctrl-btn:active { transform: scale(0.97); }
+  .ctrl-btn.primary {
+    border-color: transparent;
+    background: var(--run);
+    color: #0d0d0f;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    grid-column: span 2;
+  }
+  .ctrl-btn.primary.paused { background: var(--walk); }
+  .ctrl-btn.danger { border-color: rgba(255,92,92,0.3); color: var(--danger); }
+
+  /* ── PROGRESSION MODAL ───────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0 0 env(safe-area-inset-bottom);
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px 24px 0 0;
+    padding: 32px 24px 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .modal-icon {
+    font-size: 40px;
+    text-align: center;
+  }
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    text-align: center;
+  }
+  .modal-body {
+    font-size: 14px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .modal-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .modal-opt {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-opt:active { transform: scale(0.98); }
+  .modal-opt.highlighted {
+    border-color: var(--run);
+    background: rgba(232,245,92,0.06);
+    color: var(--run);
+  }
+  .modal-opt .opt-arrow { opacity: 0.5; }
+
+  /* ── DONE VIEW ───────────────────────────────── */
+  #done-view {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    gap: 20px;
+    text-align: center;
+  }
+  .done-icon { font-size: 64px; }
+  .done-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--run);
+  }
+  .done-body { font-size: 15px; color: var(--muted); line-height: 1.6; }
+  .done-back {
+    margin-top: 12px;
+    padding: 18px 48px;
+    border-radius: var(--radius);
+    border: none;
+    background: var(--run);
+    color: #0d0d0f;
+    font-family: 'Syne', sans-serif;
+    font-size: 17px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .done-back:active { transform: scale(0.98); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── STAGE SELECT ── -->
+  <div id="stage-select">
+    <div class="brand">
+      <div class="brand-title">Run Protocol</div>
+      <div class="brand-sub">Select your current stage</div>
+    </div>
+
+    <div>
+      <div class="select-label">Stage</div>
+      <div class="stage-grid" id="stage-grid"></div>
+    </div>
+
+    <button class="start-btn" id="start-btn" disabled>Start Session</button>
+  </div>
+
+  <!-- ── TIMER ── -->
+  <div id="timer-view">
+    <div class="top-bar">
+      <div class="stage-badge" id="stage-badge">Stage 1.1</div>
+      <div class="rep-badge">Rep <span id="rep-counter">1</span> of 5</div>
+    </div>
+
+    <div class="arc-wrap">
+      <div class="arc-svg-wrap">
+        <svg viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="130" cy="130" r="118" stroke="#2a2a30" stroke-width="10"/>
+          <circle id="arc-progress" cx="130" cy="130" r="118"
+            stroke="#e8f55c" stroke-width="10"
+            stroke-linecap="round"
+            stroke-dasharray="741.4"
+            stroke-dashoffset="0"/>
+        </svg>
+        <div class="arc-center">
+          <div class="phase-label" id="phase-label">RUN</div>
+          <div class="time-display" id="time-display">1:00</div>
+          <div class="next-phase" id="next-phase">then walk <span id="next-dur">5 min</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rep-track" id="rep-track"></div>
+
+    <div class="interval-strip">
+      <div class="interval-item">
+        <div class="interval-val r" id="run-dur-badge">1</div>
+        <div class="interval-unit">min run</div>
+      </div>
+      <div class="interval-divider"></div>
+      <div class="interval-item">
+        <div class="interval-val w" id="walk-dur-badge">5</div>
+        <div class="interval-unit">min walk</div>
+      </div>
+      <div class="interval-divider"></div>
+      <div class="interval-item">
+        <div class="interval-val" id="reps-badge" style="color:var(--text)">5</div>
+        <div class="interval-unit">reps total</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn primary" id="play-pause-btn">Pause</button>
+      <button class="ctrl-btn" id="skip-btn">Skip Phase →</button>
+      <button class="ctrl-btn danger" id="quit-btn">Quit</button>
+    </div>
+  </div>
+
+  <!-- ── DONE ── -->
+  <div id="done-view">
+    <div class="done-icon">🏁</div>
+    <div class="done-title">Protocol Complete!</div>
+    <div class="done-body">You've finished all 10 stages.<br>That's the full programme. You're a runner now.</div>
+    <button class="done-back" id="done-back-btn">Start Over</button>
+  </div>
+
+</div>
+
+<!-- progression modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-icon" id="modal-icon">🎉</div>
+    <div class="modal-title" id="modal-title">Stage Complete!</div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-options" id="modal-options"></div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────
+const STAGES = [
+  { id: '1.1', run: 1, walk: 5, reps: 5 },
+  { id: '1.2', run: 2, walk: 5, reps: 5 },
+  { id: '2.1', run: 2, walk: 4, reps: 5 },
+  { id: '2.2', run: 4, walk: 4, reps: 5 },
+  { id: '3.1', run: 3, walk: 3, reps: 5 },
+  { id: '3.2', run: 6, walk: 3, reps: 5 },
+  { id: '4.1', run: 4, walk: 2, reps: 5 },
+  { id: '4.2', run: 8, walk: 2, reps: 5 },
+  { id: '5.1', run: 5, walk: 1, reps: 5 },
+  { id: '5.2', run: 10, walk: 1, reps: 5 },
+];
+
+// Stage groups (major stage) e.g. stages that share a number
+// Within-stage progression: 1.1 -> 1.2
+// Cross-stage progression: 1.2 -> 2.1
+function getMajorStage(id) { return id.split('.')[0]; }
+function getMinorStage(id) { return id.split('.')[1]; }
+function stageIndex(id) { return STAGES.findIndex(s => s.id === id); }
+
+// ── STATE ─────────────────────────────────────────────────────────────
+let state = {
+  view: 'select',           // 'select' | 'timer' | 'done'
+  selectedStage: null,      // stage id chosen at start
+  currentStageIdx: 0,
+  currentRep: 1,            // 1-based
+  phase: 'run',             // 'run' | 'walk'
+  secondsLeft: 0,
+  totalSeconds: 0,
+  paused: true,
+  intervalId: null,
+};
+
+// ── ELEMENTS ──────────────────────────────────────────────────────────
+const stageSelect = document.getElementById('stage-select');
+const timerView   = document.getElementById('timer-view');
+const doneView    = document.getElementById('done-view');
+const stageGrid   = document.getElementById('stage-grid');
+const startBtn    = document.getElementById('start-btn');
+const stageBadge  = document.getElementById('stage-badge');
+const repCounter  = document.getElementById('rep-counter');
+const arcProgress = document.getElementById('arc-progress');
+const phaseLabel  = document.getElementById('phase-label');
+const timeDisplay = document.getElementById('time-display');
+const nextPhase   = document.getElementById('next-phase');
+const nextDur     = document.getElementById('next-dur');
+const repTrack    = document.getElementById('rep-track');
+const runBadge    = document.getElementById('run-dur-badge');
+const walkBadge   = document.getElementById('walk-dur-badge');
+const repsBadge   = document.getElementById('reps-badge');
+const playPauseBtn = document.getElementById('play-pause-btn');
+const skipBtn     = document.getElementById('skip-btn');
+const quitBtn     = document.getElementById('quit-btn');
+const doneBackBtn = document.getElementById('done-back-btn');
+const modalOverlay = document.getElementById('modal-overlay');
+const modalIcon   = document.getElementById('modal-icon');
+const modalTitle  = document.getElementById('modal-title');
+const modalBody   = document.getElementById('modal-body');
+const modalOptions = document.getElementById('modal-options');
+
+// ── BUILD STAGE SELECT ─────────────────────────────────────────────────
+function buildStageSelect() {
+  stageGrid.innerHTML = '';
+  STAGES.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'stage-btn';
+    btn.dataset.id = s.id;
+    btn.innerHTML = `
+      <div class="stage-num">${s.id}</div>
+      <div class="stage-info">
+        <span class="r">Run ${s.run}m</span> · <span class="w">Walk ${s.walk}m</span><br>× ${s.reps} reps
+      </div>`;
+    btn.addEventListener('click', () => selectStage(s.id));
+    stageGrid.appendChild(btn);
+  });
+}
+
+function selectStage(id) {
+  state.selectedStage = id;
+  document.querySelectorAll('.stage-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.id === id);
+  });
+  startBtn.disabled = false;
+}
+
+// ── SHOW VIEW ─────────────────────────────────────────────────────────
+function showView(v) {
+  stageSelect.style.display = v === 'select' ? 'flex' : 'none';
+  timerView.style.display = v === 'timer' ? 'flex' : 'none';
+  doneView.style.display = v === 'done' ? 'flex' : 'none';
+  state.view = v;
+}
+
+// ── START SESSION ─────────────────────────────────────────────────────
+function startSession() {
+  const idx = stageIndex(state.selectedStage);
+  state.currentStageIdx = idx;
+  state.currentRep = 1;
+  state.phase = 'run';
+  state.paused = false;
+
+  showView('timer');
+  loadPhase();
+  startTick();
+}
+
+function loadPhase() {
+  const s = STAGES[state.currentStageIdx];
+  const secs = (state.phase === 'run' ? s.run : s.walk) * 60;
+  state.secondsLeft = secs;
+  state.totalSeconds = secs;
+
+  updateUI();
+  renderRepDots();
+}
+
+// ── TICK ──────────────────────────────────────────────────────────────
+function startTick() {
+  clearInterval(state.intervalId);
+  state.intervalId = setInterval(tick, 1000);
+}
+
+function tick() {
+  if (state.paused) return;
+  state.secondsLeft--;
+  updateArc();
+  updateTimeDisplay();
+  if (state.secondsLeft <= 0) advancePhase();
+}
+
+function advancePhase() {
+  if (state.phase === 'run') {
+    // switch to walk
+    state.phase = 'walk';
+    loadPhase();
+  } else {
+    // walk done → rep complete
+    const s = STAGES[state.currentStageIdx];
+    if (state.currentRep < s.reps) {
+      state.currentRep++;
+      state.phase = 'run';
+      loadPhase();
+    } else {
+      // all reps done for this stage
+      clearInterval(state.intervalId);
+      showProgressionModal();
+    }
+  }
+}
+
+// ── UI UPDATES ────────────────────────────────────────────────────────
+function updateUI() {
+  const s = STAGES[state.currentStageIdx];
+  stageBadge.textContent = `Stage ${s.id}`;
+  repCounter.textContent = state.currentRep;
+  runBadge.textContent = s.run;
+  walkBadge.textContent = s.walk;
+  repsBadge.textContent = s.reps;
+
+  const isRun = state.phase === 'run';
+  phaseLabel.className = 'phase-label ' + state.phase;
+  phaseLabel.textContent = isRun ? 'RUN' : 'WALK';
+  timeDisplay.className = 'time-display ' + state.phase;
+  arcProgress.style.stroke = isRun ? 'var(--run)' : 'var(--walk)';
+
+  if (isRun) {
+    nextPhase.innerHTML = `then walk <span id="next-dur">${s.walk} min</span>`;
+  } else {
+    nextPhase.innerHTML = `then run <span>${s.run} min</span>`;
+  }
+
+  updateTimeDisplay();
+  updateArc();
+}
+
+function updateTimeDisplay() {
+  const m = Math.floor(state.secondsLeft / 60);
+  const s2 = String(state.secondsLeft % 60).padStart(2, '0');
+  timeDisplay.textContent = `${m}:${s2}`;
+  updateArc();
+}
+
+const CIRC = 2 * Math.PI * 118; // 741.4
+
+function updateArc() {
+  const pct = state.totalSeconds > 0 ? state.secondsLeft / state.totalSeconds : 0;
+  arcProgress.style.strokeDashoffset = CIRC * (1 - pct);
+}
+
+function renderRepDots() {
+  const s = STAGES[state.currentStageIdx];
+  repTrack.innerHTML = '';
+  for (let i = 1; i <= s.reps; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'rep-dot';
+    if (i < state.currentRep) dot.classList.add('done');
+    else if (i === state.currentRep) dot.classList.add('active');
+    repTrack.appendChild(dot);
+  }
+}
+
+// ── PROGRESSION MODAL ─────────────────────────────────────────────────
+function showProgressionModal() {
+  state.paused = true;
+  const curIdx = state.currentStageIdx;
+  const cur = STAGES[curIdx];
+  const nextIdx = curIdx + 1;
+  const isLastStage = nextIdx >= STAGES.length;
+  const curMajor = getMajorStage(cur.id);
+  const curMinor = getMinorStage(cur.id);
+  const isMinorB = curMinor === '2'; // .2 stages
+
+  modalOptions.innerHTML = '';
+
+  if (isLastStage) {
+    // completed everything
+    modalIcon.textContent = '🏆';
+    modalTitle.textContent = 'Programme Complete!';
+    modalBody.textContent = "You've finished every stage. You're a runner.";
+    addModalOption('🎉 Finish', true, () => { hideModal(); showView('done'); });
+  } else {
+    const next = STAGES[nextIdx];
+    const sameGroup = getMajorStage(next.id) === curMajor; // .1 → .2 within same stage
+
+    if (sameGroup) {
+      // e.g. finished 1.1, can go to 1.2 or redo 1.1
+      modalIcon.textContent = '✅';
+      modalTitle.textContent = `Stage ${cur.id} done!`;
+      modalBody.textContent = `5 reps complete. Ready to level up within Stage ${curMajor}?`;
+
+      addModalOption(`→ Stage ${next.id}  (Run ${next.run}m / Walk ${next.walk}m)`, true, () => goToStage(nextIdx));
+      addModalOption(`↩ Repeat ${cur.id}  (Run ${cur.run}m / Walk ${cur.walk}m)`, false, () => goToStage(curIdx));
+
+    } else {
+      // finished .2, can go to next major stage or stay
+      const prevIdx = curIdx - 1;
+      const prev = STAGES[prevIdx]; // the .1 of this group
+      const prevMajorNext = STAGES.find((s, i) => i === nextIdx); // .1 of next group
+
+      modalIcon.textContent = '🔥';
+      modalTitle.textContent = `Stage ${curMajor} Complete!`;
+      modalBody.textContent = `You've finished both ${prev.id} and ${cur.id}. Where to next?`;
+
+      // Option: advance to next stage group
+      addModalOption(`→ Stage ${next.id}  (Run ${next.run}m / Walk ${next.walk}m)`, true, () => goToStage(nextIdx));
+      // Option: redo current .2
+      addModalOption(`↩ Repeat ${cur.id}  (Run ${cur.run}m / Walk ${cur.walk}m)`, false, () => goToStage(curIdx));
+      // Option: go back to .1 of this group
+      addModalOption(`⬅ Back to ${prev.id}  (Run ${prev.run}m / Walk ${prev.walk}m)`, false, () => goToStage(prevIdx));
+    }
+  }
+
+  modalOverlay.classList.add('show');
+}
+
+function addModalOption(label, highlighted, action) {
+  const btn = document.createElement('button');
+  btn.className = 'modal-opt' + (highlighted ? ' highlighted' : '');
+  btn.innerHTML = `<span>${label}</span><span class="opt-arrow">›</span>`;
+  btn.addEventListener('click', () => { hideModal(); action(); });
+  modalOptions.appendChild(btn);
+}
+
+function hideModal() {
+  modalOverlay.classList.remove('show');
+}
+
+function goToStage(idx) {
+  state.currentStageIdx = idx;
+  state.currentRep = 1;
+  state.phase = 'run';
+  state.paused = false;
+  loadPhase();
+  startTick();
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────
+playPauseBtn.addEventListener('click', () => {
+  state.paused = !state.paused;
+  playPauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+  playPauseBtn.classList.toggle('paused', state.paused);
+});
+
+skipBtn.addEventListener('click', () => {
+  clearInterval(state.intervalId);
+  advancePhase();
+  if (!state.paused && state.view === 'timer') startTick();
+});
+
+quitBtn.addEventListener('click', () => {
+  if (!confirm('Quit this session and return to stage select?')) return;
+  clearInterval(state.intervalId);
+  state.paused = true;
+  showView('select');
+  // re-enable stage changing
+  document.querySelectorAll('.stage-btn').forEach(b => b.disabled = false);
+});
+
+startBtn.addEventListener('click', () => {
+  // lock stage buttons after session starts (user can't change)
+  document.querySelectorAll('.stage-btn').forEach(b => b.disabled = true);
+  startSession();
+});
+
+doneBackBtn.addEventListener('click', () => {
+  showView('select');
+  document.querySelectorAll('.stage-btn').forEach(b => {
+    b.disabled = false;
+    b.classList.remove('selected');
+  });
+  state.selectedStage = null;
+  startBtn.disabled = true;
+});
+
+// ── WAKE LOCK (keep screen on while running) ──────────────────────────
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch {}
+}
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && state.view === 'timer') {
+    await requestWakeLock();
+  }
+});
+// request on start
+startBtn.addEventListener('click', requestWakeLock, { once: false });
+
+// ── INIT ──────────────────────────────────────────────────────────────
+buildStageSelect();
+showView('select');
+</script>
+</body>
+</html>
